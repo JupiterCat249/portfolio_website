@@ -38,6 +38,7 @@
     let hasDragged = false;
     let dragStart = { x: 0, y: 0 };
     let cameraStart = { x: 0, y: 0 };
+    let panelTouchStart = { x: 0, y: 0 };
 
     // =================================================================================
     // --- INITIALIZATION ---
@@ -111,17 +112,8 @@
         }
 
         world.style.transform = `translate(${-camera.x}px, ${-camera.y}px)`;
-        
-        // --- Performance Optimization ---
-        // Only update background position if camera has moved significantly
-        const bgX = -camera.x * 0.3;
-        const bgY = -camera.y * 0.3;
-        const currentBgPos = backgroundContentLayer.style.backgroundPosition.split(' ');
-        const currentBgX = parseFloat(currentBgPos[0]);
-        const currentBgY = parseFloat(currentBgPos[1]);
-
-        if (Math.abs(bgX - currentBgX) > 1 || Math.abs(bgY - currentBgY) > 1) {
-             backgroundContentLayer.style.backgroundPosition = `${bgX}px ${bgY}px`;
+        if (backgroundContentLayer) {
+            backgroundContentLayer.style.backgroundPosition = `${-camera.x * 0.3}px ${-camera.y * 0.3}px`;
         }
     }
 
@@ -296,9 +288,22 @@
             closeDetailPanel();
         });
 
+        eventPanelOverlay.addEventListener('touchstart', (e) => {
+            const coords = e.touches ? e.touches[0] : e;
+            panelTouchStart.x = coords.clientX;
+            panelTouchStart.y = coords.clientY;
+        }, { passive: true });
+
         eventPanelOverlay.addEventListener('touchend', (e) => {
+            const coords = e.changedTouches ? e.changedTouches[0] : e;
+            const dx = coords.clientX - panelTouchStart.x;
+            const dy = coords.clientY - panelTouchStart.y;
+            const distance = Math.hypot(dx, dy);
+
+            // Only treat as a tap if the finger moved less than 10px
+            if (distance > 10) return;
+
             e.stopPropagation(); // Prevent the touch from bubbling up and moving the camera
-            // Don't close if user is selecting text or clicking the dedicated close button.
             if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
                 return;
             }
