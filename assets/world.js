@@ -332,44 +332,57 @@
         
         // Mouse and Touch Input
         function onPointerDown(e) {
-            if (e.target.closest('.event-panel')) return; // Ignore clicks inside the panel
-            e.preventDefault(); // Prevent default touch actions
+            if (e.target.closest('.event-panel') || e.target.closest('.briefing-float')) return;
+            e.preventDefault();
 
             isPointerDown = true;
             hasDragged = false;
             const coords = e.touches ? e.touches[0] : e;
             dragStart.x = coords.clientX;
             dragStart.y = coords.clientY;
-            cameraStart.x = targetCamera.x; // Drag from the target position
-            cameraStart.y = targetCamera.y;
+            // For direct manipulation, we drag from the CURRENT camera position, not the target.
+            cameraStart.x = camera.x;
+            cameraStart.y = camera.y;
             document.body.style.cursor = 'grabbing';
         }
 
         function onPointerMove(e) {
             if (!isPointerDown) return;
-            e.preventDefault(); // Prevent default touch actions
-            hasDragged = true;
+            e.preventDefault();
+            
             const coords = e.touches ? e.touches[0] : e;
             const dx = coords.clientX - dragStart.x;
             const dy = coords.clientY - dragStart.y;
-            targetCamera.x = cameraStart.x - dx;
-            targetCamera.y = cameraStart.y - dy;
+
+            // Drag deadzone to prevent tiny jitters
+            if (Math.hypot(dx, dy) < 2 && !hasDragged) {
+                return;
+            }
+            hasDragged = true;
+
+            // --- Direct Manipulation Camera Model for Dragging ---
+            // Bypass LERP for a 1:1, responsive feel.
+            camera.x = cameraStart.x - dx;
+            camera.y = cameraStart.y - dy;
+            // Keep target in sync so other movements don't jump.
+            targetCamera.x = camera.x;
+            targetCamera.y = camera.y;
         }
 
         function onPointerUp(e) {
             if (!isPointerDown) return;
             isPointerDown = false;
             document.body.style.cursor = 'default';
+            
+            // Handle point-and-click (if it wasn't a drag)
             if (!hasDragged) {
-                // This was a click, not a drag
                 const screenX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
                 const screenY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY);
                 if (screenX === undefined || screenY === undefined) return;
 
-                const worldX = (screenX - window.innerWidth / 2) + camera.x;
-                const worldY = (screenY - window.innerHeight / 2) + camera.y;
-                targetCamera.x = worldX;
-                targetCamera.y = worldY;
+                // This is a click-to-move action, so we set the TARGET camera and let it glide.
+                targetCamera.x = (screenX - window.innerWidth / 2) + camera.x;
+                targetCamera.y = (screenY - window.innerHeight / 2) + camera.y;
             }
         }
 
