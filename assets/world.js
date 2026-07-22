@@ -6,6 +6,7 @@
     // =================================================================================
 
     const LERP_FACTOR = 0.08; // Camera smoothing factor
+    const MOVE_SPEED = 5;
 
     // =================================================================================
     // --- DOM ELEMENTS ---
@@ -24,11 +25,16 @@
 
     let mapData = { nodes: [], edges: [] };
     let contentMap = new Map();
-    let playerNodeId = null;
     let activeBriefingNodeId = null;
     let camera = { x: 0, y: 0 };
     let targetCamera = { x: 0, y: 0 };
+    const keysDown = {};
     let scrollingDirection = 0; // -1 for up, 1 for down, 0 for none
+    
+    let isPointerDown = false;
+    let hasDragged = false;
+    let dragStart = { x: 0, y: 0 };
+    let cameraStart = { x: 0, y: 0 };
 
     // =================================================================================
     // --- INITIALIZATION ---
@@ -68,23 +74,22 @@
     // =================================================================================
 
     function loop() {
+        updateTargetFromKeys();
         updateCamera();
         updatePanelScroll();
         requestAnimationFrame(loop);
     }
 
-    function updatePanelScroll() {
-        if (!eventPanelOverlay.classList.contains('visible') || scrollingDirection === 0) {
-            return;
-        }
-        const contentScroller = eventPanelOverlay.querySelector('.event-panel');
-        const scrollAmount = 10; // Adjust for desired speed
-        contentScroller.scrollBy(0, scrollingDirection * scrollAmount);
+    function updateTargetFromKeys() {
+        if (isPointerDown) return; // Don't move with keys while dragging
+
+        if (keysDown['w']) targetCamera.y -= MOVE_SPEED;
+        if (keysDown['s']) targetCamera.y += MOVE_SPEED;
+        if (keysDown['a']) targetCamera.x -= MOVE_SPEED;
+        if (keysDown['d']) targetCamera.x += MOVE_SPEED;
     }
 
     function updateCamera() {
-        if (eventPanelOverlay.classList.contains('visible')) return;
-
         let dx = targetCamera.x - camera.x;
         let dy = targetCamera.y - camera.y;
 
@@ -108,8 +113,16 @@
         }
     }
 
+    function updatePanelScroll() {
+        if (!eventPanelOverlay.classList.contains('visible') || scrollingDirection === 0) return;
+        const contentScroller = eventPanelOverlay.querySelector('.event-panel');
+        const scrollAmount = 10;
+        contentScroller.scrollBy(0, scrollingDirection * scrollAmount);
+    }
+
     // =================================================================================
-    // --- DATA LOADING & PARSING ---
+    // --- DATA LOADING & PARSING (unchanged) ---
+    // ... (keeping all parsing functions as they were)
     // =================================================================================
     
     function getMdPath() {
@@ -181,7 +194,6 @@
             }
         }
 
-        // If no edges were manually defined, create them linearly
         if (!hasManualEdges && map.nodes.length > 1) {
             for (let i = 0; i < map.nodes.length - 1; i++) {
                 map.edges.push({ from: map.nodes[i].id, to: map.nodes[i+1].id });
@@ -250,66 +262,87 @@
     }
 
     function attachEventListeners() {
+        // Panel Closing
         eventPanelOverlay.querySelector('.event-panel-close').addEventListener('click', closeDetailPanel);
         eventPanelOverlay.addEventListener('click', (e) => {
-            if (window.getSelection().toString().length > 0) {
-                return;
-            }
-            if (!e.target.classList.contains('event-panel-close')) {
-                closeDetailPanel();
-            }
+            if (window.getSelection().toString().length > 0) return;
+            if (e.target === eventPanelOverlay) closeDetailPanel(); // Only close if clicking the overlay itself
         });
 
+        // Keyboard Input
         document.addEventListener('keydown', (e) => {
-            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                return; 
-            }
-
+            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
             const key = e.key.toLowerCase();
-
             if (eventPanelOverlay.classList.contains('visible')) {
-                let handled = true;
-                switch (key) {
-                    case 'e':
-                    case 'escape':
-                        closeDetailPanel();
-                        break;
-                    case 'w':
-                        scrollingDirection = -1;
-                        break;
-                    case 's':
-                        scrollingDirection = 1;
-                        break;
-                    default:
-                        handled = false;
-                        break;
-                }
-                if (handled) e.preventDefault();
+                if (key === 'w') scrollingDirection = -1;
+                if (key === 's') scrollingDirection = 1;
+                if (key === 'e' || key === 'escape') closeDetailPanel();
+                if (['w', 's', 'e', 'escape'].includes(key)) e.preventDefault();
                 return;
             }
-
-            switch (key) {
-                case 'e':
-                    handleInteraction();
-                    break;
-                case 'escape':
-                    hideBriefingFloat();
-                    break;
-                case 'a':
-                    moveHorizontal('left');
-                    break;
-                case 'd':
-                    moveHorizontal('right');
-                    break;
+            if (['w', 'a', 's', 'd'].includes(key)) {
+                keysDown[key] = true;
+                e.preventDefault();
             }
+            if (key === 'e') handleInteraction();
+            if (key === 'escape') hideBriefingFloat();
         });
 
         document.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
-            if ((key === 'w' && scrollingDirection === -1) || (key === 's' && scrollingDirection === 1)) {
-                scrollingDirection = 0;
-            }
+            if (['w', 'a', 's', 'd'].includes(key)) keysDown[key] = false;
+            if (scrollingDirection !== 0 && (key === 'w' || key === 's')) scrollingDirection = 0;
         });
+        
+        // Mouse and Touch Input
+        function onPointerDown(e) {
+            if (e.target.closest('.event-panel')) return; // Ignore clicks inside the panel
+            e.preventDefault(); // Prevent default touch actions
+
+            isPointerDown = true;
+            hasDragged = false;
+            const coords = e.touches ? e.touches[0] : e;
+            dragStart.x = coords.clientX;
+            dragStart.y = coords.clientY;
+            cameraStart.x = targetCamera.x; // Drag from the target position
+            cameraStart.y = targetCamera.y;
+            document.body.style.cursor = 'grabbing';
+        }
+
+        function onPointerMove(e) {
+            if (!isPointerDown) return;
+            e.preventDefault(); // Prevent default touch actions
+            hasDragged = true;
+            const coords = e.touches ? e.touches[0] : e;
+            const dx = coords.clientX - dragStart.x;
+            const dy = coords.clientY - dragStart.y;
+            targetCamera.x = cameraStart.x - dx;
+            targetCamera.y = cameraStart.y - dy;
+        }
+
+        function onPointerUp(e) {
+            if (!isPointerDown) return;
+            isPointerDown = false;
+            document.body.style.cursor = 'default';
+            if (!hasDragged) {
+                // This was a click, not a drag
+                const screenX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
+                const screenY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY);
+                if (screenX === undefined || screenY === undefined) return;
+
+                const worldX = (screenX - window.innerWidth / 2) + camera.x;
+                const worldY = (screenY - window.innerHeight / 2) + camera.y;
+                targetCamera.x = worldX;
+                targetCamera.y = worldY;
+            }
+        }
+
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('mousemove', onPointerMove);
+        document.addEventListener('mouseup', onPointerUp);
+        document.addEventListener('touchstart', onPointerDown, { passive: false });
+        document.addEventListener('touchmove', onPointerMove, { passive: false });
+        document.addEventListener('touchend', onPointerUp);
 
         if (backHomeButton) {
             backHomeButton.addEventListener('click', () => {
@@ -351,12 +384,16 @@
         for (const node of mapData.nodes) {
             const nodeEl = document.createElement('div');
             nodeEl.className = 'map-node';
-            if (node.portal) nodeEl.classList.add('portal-node'); // Add portal class
+            if (node.portal) nodeEl.classList.add('portal-node');
             nodeEl.style.left = `${node.x}px`;
             nodeEl.style.top = `${node.y}px`;
             nodeEl.dataset.id = node.id;
             nodeEl.innerHTML = `<div class="map-node-label">${node.label || node.id}</div>`;
-            nodeEl.addEventListener('click', () => onNodeClick(node.id));
+            nodeEl.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent click from bubbling to the document
+                targetCamera.x = node.x;
+                targetCamera.y = node.y;
+            });
             mapContainer.appendChild(nodeEl);
         }
         
@@ -369,156 +406,28 @@
         const startNode = mapData.nodes[0];
         if (typeof startNode.x !== 'number' || typeof startNode.y !== 'number') throw new Error(`Start node '${startNode.id}' has invalid coordinates.`);
         
-        playerNodeId = startNode.id;
         camera.x = targetCamera.x = startNode.x;
         camera.y = targetCamera.y = startNode.y;
         
-        updatePlayerMarker();
-        updateInteractionHints('default');
-        setTimeout(() => showBriefingFloat(playerNodeId), 500);
+        // We don't show hints or popups initially in free-roam mode
     }
 
     // =================================================================================
     // --- UI STATE & INTERACTIONS ---
     // =================================================================================
 
-    function updateInteractionHints(state) {
-        let hints = [];
-        const node = activeBriefingNodeId ? mapData.nodes.find(n => n.id === activeBriefingNodeId) : null;
-
-        switch (state) {
-            case 'briefing':
-                if (node) {
-                    hints.push(node.portal ? '[E] Enter Portal' : '[E] View Details');
-                }
-                hints.push('[A/D] To Move');
-                break;
-            case 'panel':
-                hints.push('[W/S] Scroll');
-                hints.push('[E] Close');
-                break;
-            case 'moving':
-                // No hints during transition
-                break;
-            default:
-                hints.push('[Click Node] or [A/D] To Move');
-                break;
-        }
-
-        if (hints.length) {
-            interactionPrompt.innerHTML = hints.map(h => `<span>${h}</span>`).join('');
-            interactionPrompt.classList.add('visible');
-        } else {
-            interactionPrompt.classList.remove('visible');
-        }
-    }
-    function onNodeClick(nodeId) {
-        const targetNode = mapData.nodes.find(n => n.id === nodeId);
-        if (!targetNode) return;
-
-        if (nodeId === playerNodeId) {
-            handleInteraction();
-        } else {
-            playerNodeId = nodeId;
-            if (typeof targetNode.x === 'number' && typeof targetNode.y === 'number') {
-                targetCamera.x = targetNode.x;
-                targetCamera.y = targetNode.y;
-            } else {
-                console.error(`Clicked node '${nodeId}' has invalid coordinates! Halting camera.`);
-                return;
-            }
-            
-            updatePlayerMarker();
-            hideBriefingFloat();
-            setTimeout(() => showBriefingFloat(nodeId), 400);
-        }
-    }
-
-    function showBriefingFloat(nodeId) {
-        hideBriefingFloat();
-        
-        const node = mapData.nodes.find(n => n.id === nodeId);
-        const content = contentMap.get(nodeId);
-        if (!node || !content) return;
-        
-        activeBriefingNodeId = nodeId;
-
-        briefingFloatElement.querySelector('.briefing-title').textContent = content.title || node.label;
-        briefingFloatElement.querySelector('.briefing-image').style.backgroundImage = content.firstImage ? `url(${content.firstImage})` : 'none';
-        briefingFloatElement.onclick = handleInteraction;
-        briefingFloatElement.style.cursor = 'pointer';
-
-        briefingFloatElement.style.left = `${node.x}px`;
-        briefingFloatElement.style.top = `${node.y - 30}px`;
-        briefingFloatElement.classList.add('visible');
-        
-        updateInteractionHints('briefing');
-    }
-
-    function hideBriefingFloat() {
-        if (activeBriefingNodeId) {
-            briefingFloatElement.classList.remove('visible');
-            briefingFloatElement.onclick = null;
-            briefingFloatElement.style.cursor = 'default';
-            activeBriefingNodeId = null;
-            updateInteractionHints('moving'); // Use 'moving' state during transition
-        }
-    }
-
-    function openDetailPanel() {
-        const content = contentMap.get(playerNodeId);
-        if (!content) return;
-        
-        eventPanelOverlay.querySelector('.event-panel-content').innerHTML = content.fullHtml;
-        eventPanelOverlay.classList.add('visible');
-        updateInteractionHints('panel');
-    }
-    
+    // All interaction hint, popup, and panel logic is deprecated for now
+    // and will be replaced by the proximity-based system.
+    function updateInteractionHints(state) { return; }
+    function showBriefingFloat(nodeId) { return; }
+    function hideBriefingFloat() { return; }
+    function openDetailPanel() { return; }
     function closeDetailPanel() {
-        scrollingDirection = 0; // Stop scrolling when panel closes
+        scrollingDirection = 0; // Still need this to stop scroll
         eventPanelOverlay.classList.remove('visible');
-        showBriefingFloat(playerNodeId);
     }
+    function handleInteraction() { return; }
     
-    function handleInteraction() {
-        if (!activeBriefingNodeId) return;
-        const node = mapData.nodes.find(n => n.id === activeBriefingNodeId);
-        if (!node) return;
-
-        if (node.portal) {
-            document.body.classList.add('fade-out');
-            setTimeout(() => { window.location.href = node.portal; }, 400);
-        } else {
-            hideBriefingFloat();
-            openDetailPanel();
-        }
-    }
-    
-    function moveHorizontal(direction) {
-        if (!playerNodeId) return;
-
-        const currentIndex = mapData.nodes.findIndex(n => n.id === playerNodeId);
-        if (currentIndex === -1) return;
-
-        let targetIndex = -1;
-        if (direction === 'left') {
-            targetIndex = currentIndex - 1;
-        } else if (direction === 'right') {
-            targetIndex = currentIndex + 1;
-        }
-
-        if (targetIndex >= 0 && targetIndex < mapData.nodes.length) {
-            const targetNode = mapData.nodes[targetIndex];
-            onNodeClick(targetNode.id);
-        }
-    }
-
-    function updatePlayerMarker() {
-        document.querySelectorAll('.map-node').forEach(el => {
-            el.classList.toggle('current', el.dataset.id === playerNodeId);
-        });
-    }
-
     // --- Kick it off ---
     init();
 
