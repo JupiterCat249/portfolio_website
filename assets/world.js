@@ -111,9 +111,17 @@
         }
 
         world.style.transform = `translate(${-camera.x}px, ${-camera.y}px)`;
-        if (backgroundContentLayer) {
-            const parallaxFactor = 0.3;
-            backgroundContentLayer.style.backgroundPosition = `${-camera.x * parallaxFactor}px ${-camera.y * parallaxFactor}px`;
+        
+        // --- Performance Optimization ---
+        // Only update background position if camera has moved significantly
+        const bgX = -camera.x * 0.3;
+        const bgY = -camera.y * 0.3;
+        const currentBgPos = backgroundContentLayer.style.backgroundPosition.split(' ');
+        const currentBgX = parseFloat(currentBgPos[0]);
+        const currentBgY = parseFloat(currentBgPos[1]);
+
+        if (Math.abs(bgX - currentBgX) > 1 || Math.abs(bgY - currentBgY) > 1) {
+             backgroundContentLayer.style.backgroundPosition = `${bgX}px ${bgY}px`;
         }
     }
 
@@ -494,9 +502,6 @@
         const titleDiv = briefingFloatElement.querySelector('.briefing-title');
         
         titleDiv.textContent = node.label || node.id;
-        if (node.portal) {
-            titleDiv.textContent += ' (Portal)'; // Diagnostic helper
-        }
         
         if (content.firstImage) {
             const cacheBustedUrl = `${content.firstImage.split('?')[0]}?v=${Date.now()}`;
