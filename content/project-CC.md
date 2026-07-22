@@ -85,9 +85,9 @@ From encountering a communication block, the user can perform a one-click analys
 
 ## design
 ### Design Principle: AI as a tool
-![Placeholder](content/images/design1.png)
+![Placeholder](content/images/Design1.png)
 The AI is responsible for analysis and suggestions, while the user is responsible for judging, modifying, and sending the final message.
-![Placeholder](content/images/design2.png)
+![Placeholder](content/images/Design2.png)
 ![Placeholder](content/images/design3.png)
 ![Placeholder](content/images/design4.png)
 
@@ -105,5 +105,5 @@ The key takeaway is that AI should adapt to people, not the other way around. Fu
 
 ## back_to_world
 ### Back to the Main World
-![Placeholder](content/images/intro1.png)
+![Placeholder](content/images/Intro1.png)
 This portal will take you back to the main portfolio page.

@@ -15,7 +15,7 @@ nodes:
     x: 300
     y: 200
 ---
-@background: content/images/intro1.png
+@background: content/images/Intro1.png
 
 ## intro
 ### A prototype-driven interaction designer
