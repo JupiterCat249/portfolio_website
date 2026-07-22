@@ -260,6 +260,10 @@ body.fade-out {
    RESPONSIVE (MOBILE)
    ================================== */
 @media (max-width: 768px) {
+    #background-content-layer {
+        background-size: cover;
+    }
+
     .event-panel {
         width: 90%;
         max-height: 85vh;

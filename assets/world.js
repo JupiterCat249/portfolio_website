@@ -38,7 +38,6 @@
     let hasDragged = false;
     let dragStart = { x: 0, y: 0 };
     let cameraStart = { x: 0, y: 0 };
-    let panelTouchStart = { x: 0, y: 0 };
 
     // =================================================================================
     // --- INITIALIZATION ---
@@ -66,7 +65,7 @@
             renderMapDOM();
             setupInitialState();
             loop();
-            setInterval(updateProximity, 100); // Optimize proximity check for performance
+            setInterval(updateProximity, 250); // Optimize proximity check for performance
 
         } catch (err) {
             console.error("Fatal error during initialization:", err);
@@ -280,35 +279,16 @@
         // Panel Closing
         eventPanelOverlay.querySelector('.event-panel-close').addEventListener('click', closeDetailPanel);
         eventPanelOverlay.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent the click from bubbling up and moving the camera
-            // Don't close if user is selecting text or clicking the dedicated close button.
-            if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
-                return;
+            // Only close if clicking the overlay background, not the panel itself.
+            if (e.target === eventPanelOverlay) {
+                closeDetailPanel();
             }
-            closeDetailPanel();
         });
 
-        eventPanelOverlay.addEventListener('touchstart', (e) => {
-            const coords = e.touches ? e.touches[0] : e;
-            panelTouchStart.x = coords.clientX;
-            panelTouchStart.y = coords.clientY;
-        }, { passive: true });
-
-        eventPanelOverlay.addEventListener('touchend', (e) => {
-            const coords = e.changedTouches ? e.changedTouches[0] : e;
-            const dx = coords.clientX - panelTouchStart.x;
-            const dy = coords.clientY - panelTouchStart.y;
-            const distance = Math.hypot(dx, dy);
-
-            // Only treat as a tap if the finger moved less than 10px
-            if (distance > 10) return;
-
-            e.stopPropagation(); // Prevent the touch from bubbling up and moving the camera
-            if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
-                return;
-            }
-            closeDetailPanel();
-        });
+        // Prevent touch-dragging the world when the panel is open.
+        eventPanelOverlay.addEventListener('touchmove', (e) => {
+            e.stopPropagation();
+        }, { passive: false });
 
         // Keyboard Input
         document.addEventListener('keydown', (e) => {
@@ -337,7 +317,7 @@
         
         // Mouse and Touch Input
         function onPointerDown(e) {
-            if (e.target.closest('.event-panel') || e.target.closest('.briefing-float')) return;
+            if (eventPanelOverlay.classList.contains('visible') || e.target.closest('.event-panel') || e.target.closest('#briefing-float')) return;
             e.preventDefault();
 
             isPointerDown = true;
