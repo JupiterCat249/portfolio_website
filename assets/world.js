@@ -94,7 +94,6 @@
     }
 
     function updateCamera() {
-        if (eventPanelOverlay.classList.contains('visible')) return; // STOP EVERYTHING if panel is open.
         let dx = targetCamera.x - camera.x;
         let dy = targetCamera.y - camera.y;
 
@@ -330,7 +329,7 @@
         }
 
         function onPointerMove(e) {
-            if (!isPointerDown) return;
+            if (!isPointerDown || eventPanelOverlay.classList.contains('visible')) return;
             e.preventDefault();
             
             const coords = e.touches ? e.touches[0] : e;
@@ -353,7 +352,7 @@
         }
 
         function onPointerUp(e) {
-            if (!isPointerDown) return;
+            if (!isPointerDown || eventPanelOverlay.classList.contains('visible')) return;
             isPointerDown = false;
             document.body.style.cursor = 'default';
             
