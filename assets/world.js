@@ -288,6 +288,15 @@
             closeDetailPanel();
         });
 
+        eventPanelOverlay.addEventListener('touchend', (e) => {
+            e.stopPropagation(); // Prevent the touch from bubbling up and moving the camera
+            // Don't close if user is selecting text or clicking the dedicated close button.
+            if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
+                return;
+            }
+            closeDetailPanel();
+        });
+
         // Keyboard Input
         document.addEventListener('keydown', (e) => {
             if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
