@@ -255,17 +255,13 @@
             <div class="briefing-title"></div>`;
         
         briefingFloatElement.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent click from bubbling up to the document
-            if (proximateNodeId) {
-                openDetailPanel(proximateNodeId);
-            }
+            e.stopPropagation();
+            handleInteraction();
         });
         briefingFloatElement.addEventListener('touchend', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (proximateNodeId) {
-                openDetailPanel(proximateNodeId);
-            }
+            handleInteraction();
         });
 
         world.appendChild(briefingFloatElement);
