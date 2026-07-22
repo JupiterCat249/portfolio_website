@@ -280,6 +280,7 @@
         // Panel Closing
         eventPanelOverlay.querySelector('.event-panel-close').addEventListener('click', closeDetailPanel);
         eventPanelOverlay.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent the click from bubbling up and moving the camera
             // Don't close if user is selecting text or clicking the dedicated close button.
             if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
                 return;
