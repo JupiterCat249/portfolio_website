@@ -315,7 +315,7 @@
         
         // Mouse and Touch Input
         function onPointerDown(e) {
-            if (eventPanelOverlay.classList.contains('visible') || e.target.closest('.event-panel') || e.target.closest('#briefing-float')) return;
+            if (eventPanelOverlay.classList.contains('visible') || e.target.closest('.event-panel')) return;
             e.preventDefault();
 
             isPointerDown = true;
@@ -343,6 +343,11 @@
             }
             hasDragged = true;
 
+            // If a drag has properly started, hide the briefing float so it doesn't get in the way.
+            if (proximateNodeId) {
+                hideBriefingFloat();
+            }
+
             // --- Direct Manipulation Camera Model for Dragging ---
             // Bypass LERP for a 1:1, responsive feel.
             camera.x = cameraStart.x - dx;
@@ -359,6 +364,9 @@
             
             // Handle point-and-click (if it wasn't a drag)
             if (!hasDragged) {
+                // If the click was on the float, let its own handler do the work.
+                if (e.target.closest('#briefing-float')) return;
+
                 const screenX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
                 const screenY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY);
                 if (screenX === undefined || screenY === undefined) return;
