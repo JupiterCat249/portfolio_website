@@ -278,6 +278,7 @@
     function attachEventListeners() {
         // Panel Closing
         eventPanelOverlay.querySelector('.event-panel-close').addEventListener('click', closeDetailPanel);
+        eventPanelOverlay.querySelector('.event-panel').addEventListener('click', closeDetailPanel);
         eventPanelOverlay.addEventListener('click', (e) => {
             // Only close if clicking the overlay background, not the panel itself.
             if (e.target === eventPanelOverlay) {
