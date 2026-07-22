@@ -152,15 +152,10 @@ body.fade-out {
   z-index: 1500;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%) translateY(-100%) translateY(20px) scale(0.95);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-#briefing-float.visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(-100%) translateY(0) scale(1);
-  pointer-events: auto;
-}
+
 
 .briefing-image {
     width: 100%;

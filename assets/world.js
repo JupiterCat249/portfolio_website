@@ -7,6 +7,7 @@
 
     const LERP_FACTOR = 0.08; // Camera smoothing factor
     const MOVE_SPEED = 5;
+    const PROXIMITY_THRESHOLD = 200; // How close to be to see the briefing float
 
     // =================================================================================
     // --- DOM ELEMENTS ---
@@ -15,6 +16,7 @@
     const world = document.getElementById('world');
     const backgroundContentLayer = document.getElementById('background-content-layer');
     const interactionPrompt = document.getElementById('interactionPrompt');
+    const movementPrompt = document.getElementById('movementPrompt');
     const backHomeButton = document.getElementById('backHome');
     let briefingFloatElement = null; // To be created
     let eventPanelOverlay = null; // To be created
@@ -30,6 +32,7 @@
     let targetCamera = { x: 0, y: 0 };
     const keysDown = {};
     let scrollingDirection = 0; // -1 for up, 1 for down, 0 for none
+    let proximateNodeId = null;
     
     let isPointerDown = false;
     let hasDragged = false;
@@ -77,6 +80,7 @@
         updateTargetFromKeys();
         updateCamera();
         updatePanelScroll();
+        updateProximity();
         requestAnimationFrame(loop);
     }
 
@@ -249,6 +253,14 @@
         briefingFloatElement.innerHTML = `
             <div class="briefing-image"></div>
             <div class="briefing-title"></div>`;
+        
+        briefingFloatElement.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent click from bubbling up to the document
+            if (proximateNodeId) {
+                openDetailPanel(proximateNodeId);
+            }
+        });
+
         world.appendChild(briefingFloatElement);
 
         eventPanelOverlay = document.createElement('div');
@@ -265,8 +277,11 @@
         // Panel Closing
         eventPanelOverlay.querySelector('.event-panel-close').addEventListener('click', closeDetailPanel);
         eventPanelOverlay.addEventListener('click', (e) => {
-            if (window.getSelection().toString().length > 0) return;
-            if (e.target === eventPanelOverlay) closeDetailPanel(); // Only close if clicking the overlay itself
+            // Don't close if user is selecting text or clicking the dedicated close button.
+            if (window.getSelection().toString().length > 0 || e.target.closest('.event-panel-close')) {
+                return;
+            }
+            closeDetailPanel();
         });
 
         // Keyboard Input
@@ -408,6 +423,9 @@
         
         camera.x = targetCamera.x = startNode.x;
         camera.y = targetCamera.y = startNode.y;
+
+        showMovementHint(true);
+        showInteractionHint(null);
         
         // We don't show hints or popups initially in free-roam mode
     }
@@ -416,17 +434,138 @@
     // --- UI STATE & INTERACTIONS ---
     // =================================================================================
 
-    // All interaction hint, popup, and panel logic is deprecated for now
-    // and will be replaced by the proximity-based system.
-    function updateInteractionHints(state) { return; }
-    function showBriefingFloat(nodeId) { return; }
-    function hideBriefingFloat() { return; }
-    function openDetailPanel() { return; }
+    function updateProximity() {
+        if (eventPanelOverlay.classList.contains('visible')) return; // Don't check when panel is open
+
+        if (!mapData.nodes || mapData.nodes.length === 0) return;
+
+        let closestNode = null;
+        let minDistance = Infinity;
+
+        for (const node of mapData.nodes) {
+            const distance = Math.hypot(camera.x - node.x, camera.y - node.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestNode = node;
+            }
+        }
+
+        // Check if any node is in proximity
+        if (closestNode && minDistance < PROXIMITY_THRESHOLD) {
+            if (proximateNodeId !== closestNode.id) {
+                showBriefingFloat(closestNode);
+                const actionText = closestNode.portal ? 'Enter' : 'View Details';
+                showInteractionHint(`[E] ${actionText}`);
+                proximateNodeId = closestNode.id;
+            }
+        } else if (proximateNodeId) {
+            hideBriefingFloat();
+            showInteractionHint(null);
+            proximateNodeId = null;
+        }
+    }
+
+    function showMovementHint(visible) {
+        if (!movementPrompt) return;
+        movementPrompt.textContent = visible ? '[WASD] Move / Drag to Pan' : '';
+    }
+
+    function showInteractionHint(text) {
+        if (!interactionPrompt) return;
+        interactionPrompt.textContent = text || '';
+    }
+
+    function showBriefingFloat(node) {
+        const content = contentMap.get(node.id) || {};
+        const imageDiv = briefingFloatElement.querySelector('.briefing-image');
+        const titleDiv = briefingFloatElement.querySelector('.briefing-title');
+        
+        titleDiv.textContent = node.label || node.id;
+        
+        if (content.firstImage) {
+            const cacheBustedUrl = `${content.firstImage.split('?')[0]}?v=${Date.now()}`;
+            imageDiv.style.backgroundImage = `url(${cacheBustedUrl})`;
+            imageDiv.style.display = 'block';
+        } else {
+            imageDiv.style.display = 'none';
+        }
+
+        // --- Final attempt: Manual pixel calculation --- 
+
+        // 1. Render off-screen to measure dimensions
+        briefingFloatElement.style.transition = 'none';
+        briefingFloatElement.style.opacity = '0';
+        briefingFloatElement.style.transform = 'scale(0.95)'; // Keep the scale for animation
+        briefingFloatElement.style.top = '-9999px';
+        briefingFloatElement.style.left = '-9999px';
+        
+        // Force browser to render and give us dimensions
+        void briefingFloatElement.offsetWidth;
+        const floatWidth = briefingFloatElement.offsetWidth;
+        const floatHeight = briefingFloatElement.offsetHeight;
+
+        // 2. Calculate the correct top-left position
+        const targetLeft = node.x - (floatWidth / 2);
+        const targetTop = node.y - floatHeight - 30; // 30px margin above the node
+
+        // 3. Set initial state for animation at the correct coordinates
+        briefingFloatElement.style.left = `${targetLeft}px`;
+        briefingFloatElement.style.top = `${targetTop + 20}px`; // Start 20px lower for animation
+
+        // 4. Force reflow again and then start the animation
+        void briefingFloatElement.offsetWidth;
+        briefingFloatElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease, top 0.3s ease';
+        briefingFloatElement.style.opacity = '1';
+        briefingFloatElement.style.transform = 'scale(1)';
+        briefingFloatElement.style.top = `${targetTop}px`;
+        briefingFloatElement.style.pointerEvents = 'auto'; // Make it clickable
+    }
+
+    function hideBriefingFloat() {
+        briefingFloatElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease, top 0.3s ease';
+        briefingFloatElement.style.opacity = '0';
+        briefingFloatElement.style.transform = 'scale(0.95)';
+        // Get current top and move it down
+        const currentTop = parseFloat(briefingFloatElement.style.top || 0);
+        briefingFloatElement.style.top = `${currentTop + 20}px`;
+        briefingFloatElement.style.pointerEvents = 'none';
+        proximateNodeId = null;
+    }
+
+    function openDetailPanel(nodeId) {
+        const content = contentMap.get(nodeId);
+        if (!content) return;
+
+        const contentEl = eventPanelOverlay.querySelector('.event-panel-content');
+        contentEl.innerHTML = content.fullHtml;
+        eventPanelOverlay.classList.add('visible');
+        eventPanelOverlay.querySelector('.event-panel').scrollTop = 0;
+
+        // Update hints when panel opens
+        showMovementHint(false);
+        showInteractionHint('[E] Close');
+    }
+
     function closeDetailPanel() {
         scrollingDirection = 0; // Still need this to stop scroll
         eventPanelOverlay.classList.remove('visible');
+
+        // Restore hints when panel closes
+        showMovementHint(true);
+        showInteractionHint(null); // Proximity check will show the correct hint on the next frame
     }
-    function handleInteraction() { return; }
+
+    function handleInteraction() {
+        if (!proximateNodeId) return;
+
+        const node = mapData.nodes.find(n => n.id === proximateNodeId);
+        if (node && node.portal) {
+             document.body.classList.add('fade-out');
+             setTimeout(() => { window.location.href = node.portal; }, 400);
+        } else {
+            openDetailPanel(proximateNodeId);
+        }
+    }
     
     // --- Kick it off ---
     init();
