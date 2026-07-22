@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    const SCRIPT_VERSION = "1.2"; // Manual versioning to confirm updates
+
     // =================================================================================
     // --- CONFIG & CONSTANTS ---
     // =================================================================================
@@ -448,6 +450,9 @@
         
         camera.x = targetCamera.x = startNode.x;
         camera.y = targetCamera.y = startNode.y;
+
+        document.getElementById('version-display').textContent = `v${SCRIPT_VERSION}`;
+
 
         showMovementHint(true);
         showInteractionHint(null);
