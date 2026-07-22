@@ -65,6 +65,7 @@
             renderMapDOM();
             setupInitialState();
             loop();
+            setInterval(updateProximity, 100); // Optimize proximity check for performance
 
         } catch (err) {
             console.error("Fatal error during initialization:", err);
@@ -80,7 +81,6 @@
         updateTargetFromKeys();
         updateCamera();
         updatePanelScroll();
-        updateProximity();
         requestAnimationFrame(loop);
     }
 
@@ -256,6 +256,13 @@
         
         briefingFloatElement.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent click from bubbling up to the document
+            if (proximateNodeId) {
+                openDetailPanel(proximateNodeId);
+            }
+        });
+        briefingFloatElement.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             if (proximateNodeId) {
                 openDetailPanel(proximateNodeId);
             }
