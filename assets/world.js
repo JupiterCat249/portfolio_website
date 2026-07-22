@@ -285,9 +285,12 @@
             }
         });
 
-        // Prevent touch-dragging the world when the panel is open.
         eventPanelOverlay.addEventListener('touchmove', (e) => {
-            e.stopPropagation();
+            // If the move is on the overlay background, NOT the panel content, then kill the event.
+            if (e.target === eventPanelOverlay) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
         }, { passive: false });
 
         // Keyboard Input
