@@ -494,6 +494,9 @@
         const titleDiv = briefingFloatElement.querySelector('.briefing-title');
         
         titleDiv.textContent = node.label || node.id;
+        if (node.portal) {
+            titleDiv.textContent += ' (Portal)'; // Diagnostic helper
+        }
         
         if (content.firstImage) {
             const cacheBustedUrl = `${content.firstImage.split('?')[0]}?v=${Date.now()}`;
