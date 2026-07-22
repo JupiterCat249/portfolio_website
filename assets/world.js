@@ -94,6 +94,7 @@
     }
 
     function updateCamera() {
+        if (eventPanelOverlay.classList.contains('visible')) return; // STOP EVERYTHING if panel is open.
         let dx = targetCamera.x - camera.x;
         let dy = targetCamera.y - camera.y;
 
@@ -285,13 +286,7 @@
             }
         });
 
-        eventPanelOverlay.addEventListener('touchmove', (e) => {
-            // If the move is on the overlay background, NOT the panel content, then kill the event.
-            if (e.target === eventPanelOverlay) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        }, { passive: false });
+
 
         // Keyboard Input
         document.addEventListener('keydown', (e) => {
